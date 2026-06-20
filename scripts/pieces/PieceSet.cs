@@ -243,7 +243,22 @@ public partial class PieceSet : Node3D
         if (_gameOver || !_vsComputer || _state.SideToMove != _aiColor) return;
 
         _hud.SetStatus("Computer is thinking...");
-        _engine.RequestBestMove(_state.ToFen(), SkillForDifficulty(AiDepth), MoveTimeMs, OnEngineMove);
+        if (_engine.IsReady)
+            _engine.RequestBestMove(_state.ToFen(), SkillForDifficulty(AiDepth), MoveTimeMs, OnEngineMove);
+        else
+            PlayFallbackMove();   // built-in minimax when Stockfish isn't available (e.g. Android)
+    }
+
+    private async void PlayFallbackMove()
+    {
+        await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        if (_gameOver || _state.SideToMove != _aiColor) return;
+        Move? choice = ChessAi.BestMove(_state, _aiColor, System.Math.Min(AiDepth + 1, 4));
+        if (choice is Move move)
+        {
+            ExecuteMove(move.From, move.To, move.Promotion);
+            AfterMove();
+        }
     }
 
     private void OnEngineMove(string uci)
