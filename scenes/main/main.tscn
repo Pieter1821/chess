@@ -31,3 +31,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 12)
 
 [node name="MainMenu" type="CanvasLayer" parent="."]
 script = ExtResource("6_menu")
+
+[node name="Hud" type="CanvasLayer" parent="."]
+script = ExtResource("7_hud")

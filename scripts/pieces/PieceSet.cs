@@ -21,6 +21,7 @@ public partial class PieceSet : Node3D
     private BoardState _state = null!;
     private Board _boardView = null!;
     private Hud _hud = null!;
+    private AudioStreamPlayer _moveSound = null!;
 
     private Node3D? _selected;
     private Square _selSquare;
@@ -28,6 +29,7 @@ public partial class PieceSet : Node3D
 
     private bool _vsComputer;
     private PieceColor _aiColor;
+    private PieceColor _playerColor;
     private bool _gameOver;
 
     private int _capturedWhite, _capturedBlack;
@@ -38,6 +40,9 @@ public partial class PieceSet : Node3D
         _hud = GetNode<Hud>("../Hud");
         _state = BoardState.CreateStartingPosition();
 
+        _moveSound = new AudioStreamPlayer { Stream = GD.Load<AudioStream>("res://assets/audio/move.mp3") };
+        AddChild(_moveSound);
+
         for (int file = 0; file < 8; file++)
         {
             SpawnPiece(BackRank[file], PieceColor.White, file, 0);
@@ -47,12 +52,14 @@ public partial class PieceSet : Node3D
         }
     }
 
-    public void StartVsComputer(PieceColor playerColor)
+    public void StartVsComputer(PieceColor playerColor, int depth)
     {
         _vsComputer = true;
+        AiDepth = depth;
+        _playerColor = playerColor;
         _aiColor = playerColor == PieceColor.White ? PieceColor.Black : PieceColor.White;
-        _hud.StartClock();
         _hud.SetStatus($"{_state.SideToMove} to move");
+        UpdateClock();
         MaybeTriggerAi();   // computer moves first if it is White
     }
 
@@ -119,6 +126,7 @@ public partial class PieceSet : Node3D
 
     private void ExecuteMove(Square from, Square to)
     {
+        PlayMoveSound();
         Node3D moving = _pieces[from.File, from.Rank]!;
 
         Node3D? occupant = _pieces[to.File, to.Rank];
@@ -153,8 +161,13 @@ public partial class PieceSet : Node3D
                 _hud.SetStatus($"{side} to move");
                 break;
         }
+        UpdateClock();
         return !_gameOver;
     }
+
+    // The clock ticks only on the player's turn (and only while the game is live).
+    private void UpdateClock() =>
+        _hud.SetClockRunning(!_gameOver && _state.SideToMove == _playerColor);
 
     private async void MaybeTriggerAi()
     {
@@ -167,8 +180,7 @@ public partial class PieceSet : Node3D
         if (choice is Move move)
         {
             ExecuteMove(move.From, move.To);
-            _hud.IncrementMoves();
-            AfterMove();
+            AfterMove();   // note: no IncrementMoves — only the player's moves are counted
         }
     }
 
@@ -191,6 +203,14 @@ public partial class PieceSet : Node3D
         tween.TweenProperty(piece, "position", destination, duration)
              .SetTrans(Tween.TransitionType.Sine)
              .SetEase(Tween.EaseType.Out);
+    }
+
+    private void PlayMoveSound()
+    {
+        // The source clip is long, so cut it to a short "click" after playing.
+        _moveSound.Play();
+        SceneTreeTimer timer = GetTree().CreateTimer(0.35);
+        timer.Timeout += () => _moveSound.Stop();
     }
 
     public Node3D SpawnPiece(PieceType type, PieceColor color, int file, int rank)

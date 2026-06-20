@@ -14,10 +14,10 @@ public partial class Main : Node3D
 
         rig.SetIntroView();   // cinematic overview while the menu is up
 
-        menu.SideChosen += color =>
+        menu.GameStarted += (color, depth) =>
         {
-            rig.SetViewingSide(color);        // swing camera to the player's side
-            pieces.StartVsComputer(color);    // computer plays the other side
+            rig.SetViewingSide(color);              // swing camera to the player's side
+            pieces.StartVsComputer(color, depth);   // computer plays the other side
         };
     }
 }
