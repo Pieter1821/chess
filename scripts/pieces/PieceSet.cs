@@ -3,14 +3,18 @@ using Godot;
 public partial class PieceSet : Node3D
 {
     [Export] public float PieceScale = 18.0f;
-    [Export] public float SurfaceY = 0.1f;   // top surface of the board squares
+    [Export] public float SurfaceY = 0.1f;    // top surface of the board squares
+    [Export] public float LiftHeight = 0.35f; // how far a selected piece rises
 
-    // Back-rank layout, files a..h.
     private static readonly PieceType[] BackRank =
     {
         PieceType.Rook, PieceType.Knight, PieceType.Bishop, PieceType.Queen,
         PieceType.King, PieceType.Bishop, PieceType.Knight, PieceType.Rook
     };
+
+    private readonly Node3D?[,] _pieces = new Node3D?[8, 8];
+    private Node3D? _selected;
+    private int _selFile = -1, _selRank = -1;
 
     public override void _Ready()
     {
@@ -23,6 +27,35 @@ public partial class PieceSet : Node3D
         }
     }
 
+    public Node3D? GetPieceAt(int file, int rank) => _pieces[file, rank];
+
+    public void HandleClick(int file, int rank)
+    {
+        Node3D? piece = _pieces[file, rank];
+        if (piece != null && piece != _selected)
+        {
+            Deselect();
+            _selected = piece;
+            _selFile = file;
+            _selRank = rank;
+            piece.Position = new Vector3(file, SurfaceY + LiftHeight, rank);   // lift it
+        }
+        else
+        {
+            Deselect();   // clicked empty square or the already-selected piece
+        }
+    }
+
+    private void Deselect()
+    {
+        if (_selected != null)
+        {
+            _selected.Position = new Vector3(_selFile, SurfaceY, _selRank);    // set it back down
+            _selected = null;
+            _selFile = _selRank = -1;
+        }
+    }
+
     public Node3D SpawnPiece(PieceType type, PieceColor color, int file, int rank)
     {
         string path = $"res://assets/pieces/{type.ToString().ToLower()}.glb";
@@ -30,7 +63,6 @@ public partial class PieceSet : Node3D
 
         piece.Scale = Vector3.One * PieceScale;
         piece.Position = new Vector3(file, SurfaceY, rank);
-        // Face black pieces toward white so the knights look at each other.
         piece.Rotation = new Vector3(0f, color == PieceColor.Black ? Mathf.Pi : 0f, 0f);
         piece.Name = $"{color}_{type}_{file}_{rank}";
 
@@ -40,6 +72,7 @@ public partial class PieceSet : Node3D
         ApplyTint(piece, tint);
 
         AddChild(piece);
+        _pieces[file, rank] = piece;
         return piece;
     }
 
