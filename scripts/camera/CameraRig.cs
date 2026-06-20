@@ -34,6 +34,13 @@ public partial class CameraRig : Node3D
         ResetToDefault(instant: true);
     }
 
+    public void SetViewingSide(PieceColor color)
+    {
+        // White views from yaw 180 (white at the bottom), Black from yaw 0.
+        DefaultYaw = color == PieceColor.White ? 180f : 0f;
+        _targetYaw = DefaultYaw;   // smoothing animates the swing
+    }
+
     private void ResetToDefault(bool instant = false)
     {
         _targetYaw = DefaultYaw;

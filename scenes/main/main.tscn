@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/managers/Main.cs" id="1_main"]
 [ext_resource type="Script" path="res://scripts/board/Board.cs" id="2_board"]
 [ext_resource type="Script" path="res://scripts/camera/CameraRig.cs" id="3_rig"]
 [ext_resource type="Script" path="res://scripts/pieces/PieceSet.cs" id="4_pieces"]
 [ext_resource type="Script" path="res://scripts/board/BoardInput.cs" id="5_input"]
+[ext_resource type="Script" path="res://scripts/ui/MainMenu.cs" id="6_menu"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
@@ -26,3 +27,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, 3.5)
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 12)
+
+[node name="MainMenu" type="CanvasLayer" parent="."]
+script = ExtResource("6_menu")

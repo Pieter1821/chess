@@ -1,12 +1,13 @@
 using Godot;
+using System.Collections.Generic;
 
 public partial class PieceSet : Node3D
 {
     [Export] public float PieceScale = 18.0f;
-    [Export] public float SurfaceY = 0.1f;     // top surface of the board squares
-    [Export] public float LiftHeight = 0.35f;  // how far a selected piece rises
-    [Export] public float MoveTime = 0.25f;    // seconds for a move glide
-    [Export] public float LiftTime = 0.12f;    // seconds for select/deselect
+    [Export] public float SurfaceY = 0.1f;
+    [Export] public float LiftHeight = 0.35f;
+    [Export] public float MoveTime = 0.25f;
+    [Export] public float LiftTime = 0.12f;
 
     private static readonly PieceType[] BackRank =
     {
@@ -15,11 +16,18 @@ public partial class PieceSet : Node3D
     };
 
     private readonly Node3D?[,] _pieces = new Node3D?[8, 8];
+    private BoardState _state = null!;
+    private Board _boardView = null!;
+
     private Node3D? _selected;
-    private int _selFile = -1, _selRank = -1;
+    private Square _selSquare;
+    private readonly HashSet<Square> _legalTargets = new();
 
     public override void _Ready()
     {
+        _boardView = GetNode<Board>("../Board");
+        _state = BoardState.CreateStartingPosition();
+
         for (int file = 0; file < 8; file++)
         {
             SpawnPiece(BackRank[file], PieceColor.White, file, 0);
@@ -29,63 +37,94 @@ public partial class PieceSet : Node3D
         }
     }
 
-    public Node3D? GetPieceAt(int file, int rank) => _pieces[file, rank];
-
     public void HandleClick(int file, int rank)
     {
+        var sq = new Square(file, rank);
+
         if (_selected == null)
         {
-            // Nothing selected: pick up a piece if one is here.
-            Node3D? piece = _pieces[file, rank];
-            if (piece != null) Select(piece, file, rank);
+            TrySelect(sq);
             return;
         }
 
-        if (file == _selFile && rank == _selRank)
+        if (sq == _selSquare) { Deselect(); return; }   // clicked the same piece -> cancel
+
+        if (_legalTargets.Contains(sq))
         {
-            Deselect();          // clicked the same piece -> put it back down (cancel)
+            MakeMove(_selSquare, sq);
             return;
         }
 
-        MoveSelectedTo(file, rank);   // move (capturing any occupant)
+        // Not a legal target: switch to another of our pieces, or just cancel.
+        Deselect();
+        TrySelect(sq);
     }
 
-    private void Select(Node3D piece, int file, int rank)
+    private void TrySelect(Square sq)
     {
-        _selected = piece;
-        _selFile = file;
-        _selRank = rank;
-        AnimateTo(piece, new Vector3(file, SurfaceY + LiftHeight, rank), LiftTime);
+        // Only the side whose turn it is can be picked up.
+        if (_state[sq] is not Piece piece || piece.Color != _state.SideToMove) return;
+
+        _selected = _pieces[sq.File, sq.Rank];
+        _selSquare = sq;
+        AnimateTo(_selected!, new Vector3(sq.File, SurfaceY + LiftHeight, sq.Rank), LiftTime);
+
+        // Ask the engine for legal moves and paint them.
+        _legalTargets.Clear();
+        _boardView.ClearHighlights();
+        _boardView.SetHighlight(sq.File, sq.Rank, Board.HighlightKind.Selected);
+        foreach (Move m in MoveGenerator.LegalMoves(_state, sq))
+        {
+            _legalTargets.Add(m.To);
+            Board.HighlightKind kind = _state[m.To] is Piece
+                ? Board.HighlightKind.Capture
+                : Board.HighlightKind.Move;
+            _boardView.SetHighlight(m.To.File, m.To.Rank, kind);
+        }
     }
 
     private void Deselect()
     {
         if (_selected != null)
-        {
-            AnimateTo(_selected, new Vector3(_selFile, SurfaceY, _selRank), LiftTime);
-            _selected = null;
-            _selFile = _selRank = -1;
-        }
+            AnimateTo(_selected, new Vector3(_selSquare.File, SurfaceY, _selSquare.Rank), LiftTime);
+        _selected = null;
+        _legalTargets.Clear();
+        _boardView.ClearHighlights();
     }
 
-    private void MoveSelectedTo(int destFile, int destRank)
+    private void MakeMove(Square from, Square to)
     {
-        Node3D moving = _selected!;
+        Node3D moving = _pieces[from.File, from.Rank]!;
 
-        // Capture whatever stands on the destination.
-        Node3D? occupant = _pieces[destFile, destRank];
-        if (occupant != null && occupant != moving)
-            occupant.QueueFree();
+        // Capture: slide the occupant off to the side tray (don't delete it).
+        Node3D? occupant = _pieces[to.File, to.Rank];
+        if (occupant != null && _state[to] is Piece captured)
+            SendToTray(occupant, captured.Color);
 
-        // Update the grid (source of truth): old square empties, new square holds this piece.
-        _pieces[_selFile, _selRank] = null;
-        _pieces[destFile, destRank] = moving;
+        // Keep visual grid and logical state in sync.
+        _pieces[to.File, to.Rank] = moving;
+        _pieces[from.File, from.Rank] = null;
+        _state.ApplyMove(new Move(from, to));   // also flips whose turn it is
 
-        // Glide it down onto the destination square.
-        AnimateTo(moving, new Vector3(destFile, SurfaceY, destRank), MoveTime);
+        AnimateTo(moving, new Vector3(to.File, SurfaceY, to.Rank), MoveTime);
 
         _selected = null;
-        _selFile = _selRank = -1;
+        _legalTargets.Clear();
+        _boardView.ClearHighlights();
+    }
+
+    private int _capturedWhite, _capturedBlack;
+
+    private void SendToTray(Node3D piece, PieceColor color)
+    {
+        // Captured pieces line up along the board's side edges (neater than front/back).
+        // White captures -> right edge; black captures -> left edge. Wrap outward after 8.
+        int idx = color == PieceColor.White ? _capturedWhite++ : _capturedBlack++;
+        int slot = idx % 8;          // position along the rank direction (z)
+        int lane = idx / 8;          // how far out from the board (x)
+        float z = slot * 0.85f;
+        float x = color == PieceColor.White ? 8.5f + lane * 0.9f : -1.5f - lane * 0.9f;
+        AnimateTo(piece, new Vector3(x, SurfaceY, z), MoveTime);
     }
 
     private void AnimateTo(Node3D piece, Vector3 destination, float duration)
