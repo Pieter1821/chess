@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/managers/Main.cs" id="1_main"]
 [ext_resource type="Script" path="res://scripts/board/Board.cs" id="2_board"]
@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://scripts/ui/MainMenu.cs" id="6_menu"]
 [ext_resource type="Script" path="res://scripts/ui/Hud.cs" id="7_hud"]
 [ext_resource type="Script" path="res://scripts/ui/MoveHistory.cs" id="8_history"]
+[ext_resource type="Script" path="res://scripts/engine/StockfishEngine.cs" id="9_engine"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
@@ -38,3 +39,6 @@ script = ExtResource("7_hud")
 
 [node name="MoveHistory" type="CanvasLayer" parent="."]
 script = ExtResource("8_history")
+
+[node name="Stockfish" type="Node" parent="."]
+script = ExtResource("9_engine")

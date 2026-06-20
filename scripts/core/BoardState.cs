@@ -38,6 +38,32 @@ public sealed class BoardState
         return sb.ToString();
     }
 
+    // Forsyth-Edwards Notation: the position string a UCI engine (Stockfish) reads.
+    public string ToFen()
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int r = 7; r >= 0; r--)
+        {
+            int empty = 0;
+            for (int f = 0; f < 8; f++)
+            {
+                if (_squares[f, r] is Piece p)
+                {
+                    if (empty > 0) { sb.Append(empty); empty = 0; }
+                    sb.Append(PieceChar(p));
+                }
+                else empty++;
+            }
+            if (empty > 0) sb.Append(empty);
+            if (r > 0) sb.Append('/');
+        }
+        sb.Append(SideToMove == PieceColor.White ? " w " : " b ");
+        sb.Append("- - ");           // castling / en passant not tracked yet
+        sb.Append(HalfmoveClock);
+        sb.Append(" 1");             // fullmove number
+        return sb.ToString();
+    }
+
     private static char PieceChar(Piece p)
     {
         char c = p.Type switch

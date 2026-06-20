@@ -8,8 +8,8 @@ public partial class PieceSet : Node3D
     [Export] public float LiftHeight = 0.35f;
     [Export] public float MoveTime = 0.25f;
     [Export] public float LiftTime = 0.12f;
-    [Export] public float AiThinkTime = 0.4f;
-    [Export] public int AiDepth = 3;
+    [Export] public int MoveTimeMs = 300;   // Stockfish think time per move (ms)
+    [Export] public int AiDepth = 3;         // difficulty index (1=Easy, 2=Medium, 3=Hard)
 
     private static readonly PieceType[] BackRank =
     {
@@ -22,6 +22,7 @@ public partial class PieceSet : Node3D
     private Board _boardView = null!;
     private Hud _hud = null!;
     private MoveHistory _history = null!;
+    private StockfishEngine _engine = null!;
     private AudioStreamPlayer _moveSound = null!;
 
     private Node3D? _selected;
@@ -42,6 +43,7 @@ public partial class PieceSet : Node3D
         _boardView = GetNode<Board>("../Board");
         _hud = GetNode<Hud>("../Hud");
         _history = GetNode<MoveHistory>("../MoveHistory");
+        _engine = GetNode<StockfishEngine>("../Stockfish");
         _hud.DrawRequested += OfferDraw;
         _state = BoardState.CreateStartingPosition();
 
@@ -208,21 +210,46 @@ public partial class PieceSet : Node3D
     private void UpdateClock() =>
         _hud.SetClockRunning(!_gameOver && _state.SideToMove == _playerColor);
 
-    private async void MaybeTriggerAi()
+    private void MaybeTriggerAi()
     {
         if (_gameOver || !_vsComputer || _state.SideToMove != _aiColor) return;
 
         _hud.SetStatus("Computer is thinking...");
-        await ToSignal(GetTree().CreateTimer(AiThinkTime), SceneTreeTimer.SignalName.Timeout);
-        if (_gameOver) return;
-
-        Move? choice = ChessAi.BestMove(_state, _aiColor, AiDepth);
-        if (choice is Move move)
-        {
-            ExecuteMove(move.From, move.To, move.Promotion);
-            AfterMove();   // note: no IncrementMoves — only the player's moves are counted
-        }
+        _engine.RequestBestMove(_state.ToFen(), SkillForDifficulty(AiDepth), MoveTimeMs, OnEngineMove);
     }
+
+    private void OnEngineMove(string uci)
+    {
+        if (_gameOver || uci.Length < 4 || _state.SideToMove != _aiColor) return;
+
+        Move move = ParseUci(uci);
+        ExecuteMove(move.From, move.To, move.Promotion);
+        AfterMove();   // no IncrementMoves — only the player's moves are counted
+    }
+
+    private static Move ParseUci(string uci)
+    {
+        var from = new Square(uci[0] - 'a', uci[1] - '1');
+        var to = new Square(uci[2] - 'a', uci[3] - '1');
+        PieceType? promotion = uci.Length > 4 ? CharToPiece(uci[4]) : null;
+        return new Move(from, to, promotion);
+    }
+
+    private static PieceType? CharToPiece(char c) => char.ToLower(c) switch
+    {
+        'q' => PieceType.Queen,
+        'r' => PieceType.Rook,
+        'b' => PieceType.Bishop,
+        'n' => PieceType.Knight,
+        _ => (PieceType?)null,
+    };
+
+    private static int SkillForDifficulty(int difficulty) => difficulty switch
+    {
+        1 => 2,    // Easy
+        2 => 8,    // Medium
+        _ => 16,   // Hard
+    };
 
     private static PieceColor Other(PieceColor c) =>
         c == PieceColor.White ? PieceColor.Black : PieceColor.White;
