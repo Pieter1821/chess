@@ -93,7 +93,10 @@ public static class MoveGenerator
         {
             case PieceType.Pawn:   AddPawnMoves(board, from, piece.Color, moves); break;
             case PieceType.Knight: AddStepMoves(board, from, piece.Color, KnightOffsets, moves); break;
-            case PieceType.King:   AddStepMoves(board, from, piece.Color, KingOffsets, moves); break;
+            case PieceType.King:
+                AddStepMoves(board, from, piece.Color, KingOffsets, moves);
+                AddCastlingMoves(board, from, piece.Color, moves);
+                break;
             case PieceType.Bishop: AddSlideMoves(board, from, piece.Color, BishopDirs, moves); break;
             case PieceType.Rook:   AddSlideMoves(board, from, piece.Color, RookDirs, moves); break;
             case PieceType.Queen:
@@ -153,9 +156,37 @@ public static class MoveGenerator
         foreach (int df in new[] { -1, 1 })
         {
             var cap = new Square(from.File + df, from.Rank + dir);
-            if (cap.IsOnBoard && board[cap] is Piece occ && occ.Color != me)
+            if (!cap.IsOnBoard) continue;
+            bool enemyThere = board[cap] is Piece occ && occ.Color != me;
+            bool enPassant = board.EnPassantTarget is Square ep && cap == ep;
+            if (enemyThere || enPassant)
                 AddPawnMove(moves, from, cap, promoRank);
         }
+    }
+
+    // Castling: king moves two squares toward a rook (the rook relocation is handled in ApplyMove).
+    private static void AddCastlingMoves(BoardState board, Square from, PieceColor me, List<Move> moves)
+    {
+        int rank = me == PieceColor.White ? 0 : 7;
+        if (from.File != 4 || from.Rank != rank) return;   // king must be on its home square
+        PieceColor enemy = Opposite(me);
+        if (IsAttacked(board, from, enemy)) return;        // can't castle out of check
+
+        bool kingside = me == PieceColor.White ? board.WhiteOO : board.BlackOO;
+        bool queenside = me == PieceColor.White ? board.WhiteOOO : board.BlackOOO;
+
+        if (kingside
+            && board[new Square(5, rank)] is null && board[new Square(6, rank)] is null
+            && !IsAttacked(board, new Square(5, rank), enemy)
+            && !IsAttacked(board, new Square(6, rank), enemy))
+            moves.Add(new Move(from, new Square(6, rank)));
+
+        if (queenside
+            && board[new Square(1, rank)] is null && board[new Square(2, rank)] is null
+            && board[new Square(3, rank)] is null
+            && !IsAttacked(board, new Square(3, rank), enemy)
+            && !IsAttacked(board, new Square(2, rank), enemy))
+            moves.Add(new Move(from, new Square(2, rank)));
     }
 
     // Reaching the last rank promotes: emit one move per promotion choice.

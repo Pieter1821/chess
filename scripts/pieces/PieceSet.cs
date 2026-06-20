@@ -149,11 +149,27 @@ public partial class PieceSet : Node3D
     {
         PlayMoveSound();
         string desc = Notation.ToFriendly(_state, new Move(from, to, promotion));   // board BEFORE the move
+
+        Piece mover = _state[from]!.Value;
+        bool isCastle = mover.Type == PieceType.King && Mathf.Abs(to.File - from.File) == 2;
+        bool isEnPassant = mover.Type == PieceType.Pawn && from.File != to.File && _pieces[to.File, to.Rank] == null;
+
         Node3D moving = _pieces[from.File, from.Rank]!;
 
+        // Normal capture on the destination square.
         Node3D? occupant = _pieces[to.File, to.Rank];
         if (occupant != null && _state[to] is Piece captured)
             SendToTray(occupant, captured.Color);
+
+        // En passant: the captured pawn sits beside the destination, on the mover's rank.
+        if (isEnPassant)
+        {
+            var capSq = new Square(to.File, from.Rank);
+            Node3D? epPawn = _pieces[capSq.File, capSq.Rank];
+            if (epPawn != null && _state[capSq] is Piece epCaptured)
+                SendToTray(epPawn, epCaptured.Color);
+            _pieces[capSq.File, capSq.Rank] = null;
+        }
 
         _state.ApplyMove(new Move(from, to, promotion));
         _pieces[from.File, from.Rank] = null;
@@ -167,6 +183,18 @@ public partial class PieceSet : Node3D
         {
             _pieces[to.File, to.Rank] = moving;
             AnimateTo(moving, new Vector3(to.File, SurfaceY, to.Rank), MoveTime);
+        }
+
+        // Castling: slide the rook to the far side of the king.
+        if (isCastle)
+        {
+            int rank = from.Rank;
+            var rookFrom = to.File == 6 ? new Square(7, rank) : new Square(0, rank);
+            var rookTo = to.File == 6 ? new Square(5, rank) : new Square(3, rank);
+            Node3D rook = _pieces[rookFrom.File, rookFrom.Rank]!;
+            _pieces[rookTo.File, rookTo.Rank] = rook;
+            _pieces[rookFrom.File, rookFrom.Rank] = null;
+            AnimateTo(rook, new Vector3(rookTo.File, SurfaceY, rookTo.Rank), MoveTime);
         }
 
         _history.AddMove(desc);

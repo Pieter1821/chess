@@ -6,7 +6,7 @@ public class FenTests
     public void StartingPosition_Fen()
     {
         var b = BoardState.CreateStartingPosition();
-        Assert.Equal("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1", b.ToFen());
+        Assert.Equal("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", b.ToFen());
     }
 
     [Fact]
