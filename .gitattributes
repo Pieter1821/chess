@@ -1,0 +1,8 @@
+# Normalize EOL for all files that don't have `text=auto`
+* text=auto eol=lf
+
+# Treat Godot binary resources as binary
+*.res binary
+*.tres text eol=lf
+*.scn binary
+*.tscn text eol=lf
