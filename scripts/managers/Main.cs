@@ -9,6 +9,10 @@ public partial class Main : Node3D
         sun.ShadowEnabled = true;
         sun.LightEnergy = 1.2f;
 
+        // Use the logo as the window/taskbar icon.
+        var logo = GD.Load<Texture2D>("res://assets/art/logo.png");
+        if (logo != null) DisplayServer.SetIcon(logo.GetImage());
+
         // Ambient fill + background so pieces don't sink into shadow.
         var env = new Godot.Environment
         {
