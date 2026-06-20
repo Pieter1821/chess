@@ -5,7 +5,7 @@ public partial class CameraRig : Node3D
     // --- Tunables (editable in the Inspector) ---
     [Export] public float MinZoom = 4.0f;
     [Export] public float MaxZoom = 18.0f;
-    [Export] public float DefaultZoom = 12.0f;
+    [Export] public float DefaultZoom = 9.0f;
     [Export] public float ZoomStep = 1.0f;          // distance change per wheel notch
     [Export] public float MinPitch = 15.0f;         // degrees above the board (clamp = no clipping)
     [Export] public float MaxPitch = 80.0f;         // near top-down
@@ -34,11 +34,21 @@ public partial class CameraRig : Node3D
         ResetToDefault(instant: true);
     }
 
+    // A cinematic overview pose used while the start menu is up.
+    public void SetIntroView()
+    {
+        _targetYaw = 35f;
+        _targetPitch = 62f;
+        _targetZoom = 16f;
+    }
+
     public void SetViewingSide(PieceColor color)
     {
         // White views from yaw 180 (white at the bottom), Black from yaw 0.
         DefaultYaw = color == PieceColor.White ? 180f : 0f;
-        _targetYaw = DefaultYaw;   // smoothing animates the swing
+        _targetYaw = DefaultYaw;       // smoothing animates the swing to the player's side
+        _targetPitch = DefaultPitch;
+        _targetZoom = DefaultZoom;
     }
 
     private void ResetToDefault(bool instant = false)

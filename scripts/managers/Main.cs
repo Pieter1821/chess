@@ -9,7 +9,15 @@ public partial class Main : Node3D
         sun.ShadowEnabled = true;
 
         var rig = GetNode<CameraRig>("CameraRig");
+        var pieces = GetNode<PieceSet>("Pieces");
         var menu = GetNode<MainMenu>("MainMenu");
-        menu.SideChosen += rig.SetViewingSide;   // flip the camera to the chosen side
+
+        rig.SetIntroView();   // cinematic overview while the menu is up
+
+        menu.SideChosen += color =>
+        {
+            rig.SetViewingSide(color);        // swing camera to the player's side
+            pieces.StartVsComputer(color);    // computer plays the other side
+        };
     }
 }

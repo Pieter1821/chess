@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/managers/Main.cs" id="1_main"]
 [ext_resource type="Script" path="res://scripts/board/Board.cs" id="2_board"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://scripts/pieces/PieceSet.cs" id="4_pieces"]
 [ext_resource type="Script" path="res://scripts/board/BoardInput.cs" id="5_input"]
 [ext_resource type="Script" path="res://scripts/ui/MainMenu.cs" id="6_menu"]
+[ext_resource type="Script" path="res://scripts/ui/Hud.cs" id="7_hud"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")

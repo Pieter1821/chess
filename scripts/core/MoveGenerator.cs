@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 
-// Produces pseudo-legal moves (correct motion + blocking + captures).
-// "Leaves own king in check" filtering is added in the check phase.
+public enum GameStatus { Ongoing, Check, Checkmate, Stalemate }
+
 public static class MoveGenerator
 {
     private static readonly (int df, int dr)[] KnightOffsets =
@@ -13,7 +13,54 @@ public static class MoveGenerator
     private static readonly (int df, int dr)[] RookDirs = { (1, 0), (-1, 0), (0, 1), (0, -1) };
     private static readonly (int df, int dr)[] BishopDirs = { (1, 1), (1, -1), (-1, 1), (-1, -1) };
 
+    // Fully legal: pseudo-legal moves minus any that leave the mover's own king in check.
     public static List<Move> LegalMoves(BoardState board, Square from)
+    {
+        var legal = new List<Move>();
+        if (board[from] is not Piece piece) return legal;
+        foreach (Move m in PseudoLegalMoves(board, from))
+            if (!InCheck(board.WithMove(m), piece.Color))
+                legal.Add(m);
+        return legal;
+    }
+
+    public static List<Move> AllMoves(BoardState board, PieceColor color)
+        => CollectMoves(board, color, legalOnly: true);
+
+    // Faster, unfiltered set used inside the AI search (king value stands in for legality).
+    public static List<Move> AllPseudoMoves(BoardState board, PieceColor color)
+        => CollectMoves(board, color, legalOnly: false);
+
+    public static GameStatus Status(BoardState board, PieceColor sideToMove)
+    {
+        bool inCheck = InCheck(board, sideToMove);
+        bool hasMove = AllMoves(board, sideToMove).Count > 0;
+        if (!hasMove) return inCheck ? GameStatus.Checkmate : GameStatus.Stalemate;
+        return inCheck ? GameStatus.Check : GameStatus.Ongoing;
+    }
+
+    public static bool InCheck(BoardState board, PieceColor color)
+    {
+        Square king = FindKing(board, color);
+        return king.IsOnBoard && IsAttacked(board, king, Opposite(color));
+    }
+
+    // ---------- internals ----------
+
+    private static List<Move> CollectMoves(BoardState board, PieceColor color, bool legalOnly)
+    {
+        var all = new List<Move>();
+        for (int f = 0; f < 8; f++)
+        for (int r = 0; r < 8; r++)
+        {
+            var sq = new Square(f, r);
+            if (board[sq] is Piece p && p.Color == color)
+                all.AddRange(legalOnly ? LegalMoves(board, sq) : PseudoLegalMoves(board, sq));
+        }
+        return all;
+    }
+
+    private static List<Move> PseudoLegalMoves(BoardState board, Square from)
     {
         var moves = new List<Move>();
         if (board[from] is not Piece piece) return moves;
@@ -33,19 +80,6 @@ public static class MoveGenerator
         return moves;
     }
 
-    public static List<Move> AllMoves(BoardState board, PieceColor color)
-    {
-        var all = new List<Move>();
-        for (int f = 0; f < 8; f++)
-        for (int r = 0; r < 8; r++)
-        {
-            var sq = new Square(f, r);
-            if (board[sq] is Piece p && p.Color == color)
-                all.AddRange(LegalMoves(board, sq));
-        }
-        return all;
-    }
-
     private static void AddStepMoves(BoardState board, Square from, PieceColor me,
                                      (int df, int dr)[] offsets, List<Move> moves)
     {
@@ -53,7 +87,7 @@ public static class MoveGenerator
         {
             var to = new Square(from.File + df, from.Rank + dr);
             if (!to.IsOnBoard) continue;
-            if (board[to] is Piece occ && occ.Color == me) continue; // own piece blocks
+            if (board[to] is Piece occ && occ.Color == me) continue;
             moves.Add(new Move(from, to));
         }
     }
@@ -68,8 +102,8 @@ public static class MoveGenerator
             {
                 if (board[to] is Piece occ)
                 {
-                    if (occ.Color != me) moves.Add(new Move(from, to)); // capture
-                    break;                                              // blocked either way
+                    if (occ.Color != me) moves.Add(new Move(from, to));
+                    break;
                 }
                 moves.Add(new Move(from, to));
                 to = new Square(to.File + df, to.Rank + dr);
@@ -98,4 +132,70 @@ public static class MoveGenerator
                 moves.Add(new Move(from, cap));
         }
     }
+
+    // Is `sq` attacked by any piece of color `by`?
+    public static bool IsAttacked(BoardState board, Square sq, PieceColor by)
+    {
+        // Pawn: a `by` pawn attacks diagonally forward, so it sits one rank "behind" sq.
+        int dir = by == PieceColor.White ? 1 : -1;
+        foreach (int df in new[] { -1, 1 })
+        {
+            var p = new Square(sq.File + df, sq.Rank - dir);
+            if (p.IsOnBoard && board[p] is Piece pc && pc.Color == by && pc.Type == PieceType.Pawn)
+                return true;
+        }
+
+        if (HasAttackerAt(board, sq, by, KnightOffsets, PieceType.Knight)) return true;
+        if (HasAttackerAt(board, sq, by, KingOffsets, PieceType.King)) return true;
+        if (SlideAttack(board, sq, by, RookDirs, PieceType.Rook)) return true;
+        if (SlideAttack(board, sq, by, BishopDirs, PieceType.Bishop)) return true;
+        return false;
+    }
+
+    private static bool HasAttackerAt(BoardState board, Square sq, PieceColor by,
+                                      (int df, int dr)[] offsets, PieceType type)
+    {
+        foreach (var (df, dr) in offsets)
+        {
+            var s = new Square(sq.File + df, sq.Rank + dr);
+            if (s.IsOnBoard && board[s] is Piece p && p.Color == by && p.Type == type)
+                return true;
+        }
+        return false;
+    }
+
+    private static bool SlideAttack(BoardState board, Square sq, PieceColor by,
+                                    (int df, int dr)[] dirs, PieceType sliderType)
+    {
+        foreach (var (df, dr) in dirs)
+        {
+            var s = new Square(sq.File + df, sq.Rank + dr);
+            while (s.IsOnBoard)
+            {
+                if (board[s] is Piece occ)
+                {
+                    if (occ.Color == by && (occ.Type == sliderType || occ.Type == PieceType.Queen))
+                        return true;
+                    break;
+                }
+                s = new Square(s.File + df, s.Rank + dr);
+            }
+        }
+        return false;
+    }
+
+    private static Square FindKing(BoardState board, PieceColor color)
+    {
+        for (int f = 0; f < 8; f++)
+        for (int r = 0; r < 8; r++)
+        {
+            var sq = new Square(f, r);
+            if (board[sq] is Piece p && p.Type == PieceType.King && p.Color == color)
+                return sq;
+        }
+        return new Square(-1, -1);
+    }
+
+    private static PieceColor Opposite(PieceColor c) =>
+        c == PieceColor.White ? PieceColor.Black : PieceColor.White;
 }

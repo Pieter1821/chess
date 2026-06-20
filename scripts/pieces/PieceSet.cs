@@ -1,5 +1,5 @@
-using Godot;
 using System.Collections.Generic;
+using Godot;
 
 public partial class PieceSet : Node3D
 {
@@ -8,6 +8,8 @@ public partial class PieceSet : Node3D
     [Export] public float LiftHeight = 0.35f;
     [Export] public float MoveTime = 0.25f;
     [Export] public float LiftTime = 0.12f;
+    [Export] public float AiThinkTime = 0.4f;
+    [Export] public int AiDepth = 3;
 
     private static readonly PieceType[] BackRank =
     {
@@ -18,14 +20,22 @@ public partial class PieceSet : Node3D
     private readonly Node3D?[,] _pieces = new Node3D?[8, 8];
     private BoardState _state = null!;
     private Board _boardView = null!;
+    private Hud _hud = null!;
 
     private Node3D? _selected;
     private Square _selSquare;
     private readonly HashSet<Square> _legalTargets = new();
 
+    private bool _vsComputer;
+    private PieceColor _aiColor;
+    private bool _gameOver;
+
+    private int _capturedWhite, _capturedBlack;
+
     public override void _Ready()
     {
         _boardView = GetNode<Board>("../Board");
+        _hud = GetNode<Hud>("../Hud");
         _state = BoardState.CreateStartingPosition();
 
         for (int file = 0; file < 8; file++)
@@ -37,39 +47,43 @@ public partial class PieceSet : Node3D
         }
     }
 
+    public void StartVsComputer(PieceColor playerColor)
+    {
+        _vsComputer = true;
+        _aiColor = playerColor == PieceColor.White ? PieceColor.Black : PieceColor.White;
+        _hud.StartClock();
+        _hud.SetStatus($"{_state.SideToMove} to move");
+        MaybeTriggerAi();   // computer moves first if it is White
+    }
+
     public void HandleClick(int file, int rank)
     {
+        if (_gameOver) return;
+        if (_vsComputer && _state.SideToMove == _aiColor) return;
+
         var sq = new Square(file, rank);
 
-        if (_selected == null)
-        {
-            TrySelect(sq);
-            return;
-        }
-
-        if (sq == _selSquare) { Deselect(); return; }   // clicked the same piece -> cancel
+        if (_selected == null) { TrySelect(sq); return; }
+        if (sq == _selSquare) { Deselect(); return; }
 
         if (_legalTargets.Contains(sq))
         {
-            MakeMove(_selSquare, sq);
+            PlayerMove(_selSquare, sq);
             return;
         }
 
-        // Not a legal target: switch to another of our pieces, or just cancel.
         Deselect();
         TrySelect(sq);
     }
 
     private void TrySelect(Square sq)
     {
-        // Only the side whose turn it is can be picked up.
         if (_state[sq] is not Piece piece || piece.Color != _state.SideToMove) return;
 
         _selected = _pieces[sq.File, sq.Rank];
         _selSquare = sq;
         AnimateTo(_selected!, new Vector3(sq.File, SurfaceY + LiftHeight, sq.Rank), LiftTime);
 
-        // Ask the engine for legal moves and paint them.
         _legalTargets.Clear();
         _boardView.ClearHighlights();
         _boardView.SetHighlight(sq.File, sq.Rank, Board.HighlightKind.Selected);
@@ -92,36 +106,80 @@ public partial class PieceSet : Node3D
         _boardView.ClearHighlights();
     }
 
-    private void MakeMove(Square from, Square to)
+    private void PlayerMove(Square from, Square to)
+    {
+        _selected = null;
+        _legalTargets.Clear();
+        _boardView.ClearHighlights();
+
+        ExecuteMove(from, to);
+        _hud.IncrementMoves();
+        if (AfterMove()) MaybeTriggerAi();
+    }
+
+    private void ExecuteMove(Square from, Square to)
     {
         Node3D moving = _pieces[from.File, from.Rank]!;
 
-        // Capture: slide the occupant off to the side tray (don't delete it).
         Node3D? occupant = _pieces[to.File, to.Rank];
         if (occupant != null && _state[to] is Piece captured)
             SendToTray(occupant, captured.Color);
 
-        // Keep visual grid and logical state in sync.
         _pieces[to.File, to.Rank] = moving;
         _pieces[from.File, from.Rank] = null;
-        _state.ApplyMove(new Move(from, to));   // also flips whose turn it is
+        _state.ApplyMove(new Move(from, to));
 
         AnimateTo(moving, new Vector3(to.File, SurfaceY, to.Rank), MoveTime);
-
-        _selected = null;
-        _legalTargets.Clear();
-        _boardView.ClearHighlights();
     }
 
-    private int _capturedWhite, _capturedBlack;
+    // Updates the HUD for the new side to move; returns false if the game has ended.
+    private bool AfterMove()
+    {
+        PieceColor side = _state.SideToMove;
+        switch (MoveGenerator.Status(_state, side))
+        {
+            case GameStatus.Checkmate:
+                _gameOver = true;
+                _hud.GameOver($"Checkmate — {Other(side)} wins!");
+                break;
+            case GameStatus.Stalemate:
+                _gameOver = true;
+                _hud.GameOver("Stalemate — draw");
+                break;
+            case GameStatus.Check:
+                _hud.SetStatus($"{side} to move — Check!");
+                break;
+            default:
+                _hud.SetStatus($"{side} to move");
+                break;
+        }
+        return !_gameOver;
+    }
+
+    private async void MaybeTriggerAi()
+    {
+        if (_gameOver || !_vsComputer || _state.SideToMove != _aiColor) return;
+
+        await ToSignal(GetTree().CreateTimer(AiThinkTime), SceneTreeTimer.SignalName.Timeout);
+        if (_gameOver) return;
+
+        Move? choice = ChessAi.BestMove(_state, _aiColor, AiDepth);
+        if (choice is Move move)
+        {
+            ExecuteMove(move.From, move.To);
+            _hud.IncrementMoves();
+            AfterMove();
+        }
+    }
+
+    private static PieceColor Other(PieceColor c) =>
+        c == PieceColor.White ? PieceColor.Black : PieceColor.White;
 
     private void SendToTray(Node3D piece, PieceColor color)
     {
-        // Captured pieces line up along the board's side edges (neater than front/back).
-        // White captures -> right edge; black captures -> left edge. Wrap outward after 8.
         int idx = color == PieceColor.White ? _capturedWhite++ : _capturedBlack++;
-        int slot = idx % 8;          // position along the rank direction (z)
-        int lane = idx / 8;          // how far out from the board (x)
+        int slot = idx % 8;
+        int lane = idx / 8;
         float z = slot * 0.85f;
         float x = color == PieceColor.White ? 8.5f + lane * 0.9f : -1.5f - lane * 0.9f;
         AnimateTo(piece, new Vector3(x, SurfaceY, z), MoveTime);

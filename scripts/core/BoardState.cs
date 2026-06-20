@@ -17,6 +17,22 @@ public sealed class BoardState
         SideToMove = SideToMove == PieceColor.White ? PieceColor.Black : PieceColor.White;
     }
 
+    public BoardState Clone()
+    {
+        var copy = new BoardState();
+        System.Array.Copy(_squares, copy._squares, _squares.Length);
+        copy.SideToMove = SideToMove;
+        return copy;
+    }
+
+    // Returns a NEW board with the move applied (the search uses this to explore safely).
+    public BoardState WithMove(Move move)
+    {
+        BoardState next = Clone();
+        next.ApplyMove(move);
+        return next;
+    }
+
     public static BoardState CreateStartingPosition()
     {
         var board = new BoardState();
