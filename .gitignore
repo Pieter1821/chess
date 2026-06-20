@@ -26,3 +26,7 @@ engine/
 
 # Local docs / planning notes (not part of the shipped game)
 docs/
+
+# Export output
+build/
+*.zip

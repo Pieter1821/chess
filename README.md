@@ -19,6 +19,17 @@ plain-English move history.
   <img src="assets/art/splash.png" width="640" alt="Chess splash">
 </p>
 
+## ▶️ Download & play (Windows)
+
+Grab the latest build from the [**Releases**](https://github.com/Pieter1821/chess/releases) page:
+
+1. Download **`Chess-Windows.zip`**
+2. Unzip it anywhere
+3. Double-click **`Chess.exe`**
+
+No installation needed. Windows may show a "Windows protected your PC" warning for this
+unsigned indie build — click **More info → Run anyway**.
+
 ## Features
 
 - ♟️ **Full legal chess** — all piece movement, check, checkmate, stalemate, and
