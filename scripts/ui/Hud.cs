@@ -12,6 +12,10 @@ public partial class Hud : CanvasLayer
 
     public event Action? DrawRequested;
 
+    private ColorRect _promoOverlay = null!;
+    private CenterContainer _promoScreen = null!;
+    private Action<PieceType>? _promoCallback;
+
     private double _elapsed;
     private bool _running;
     private bool _gameOver;
@@ -63,6 +67,54 @@ public partial class Hud : CanvasLayer
         };
         _drawButton.Pressed += () => DrawRequested?.Invoke();
         AddChild(_drawButton);
+
+        _promoOverlay = new ColorRect { Color = new Color(0f, 0f, 0f, 0.55f), Visible = false };
+        _promoOverlay.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        _promoOverlay.MouseFilter = Control.MouseFilterEnum.Stop;
+        AddChild(_promoOverlay);
+
+        _promoScreen = new CenterContainer { Visible = false };
+        _promoScreen.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        AddChild(_promoScreen);
+
+        var pbox = new VBoxContainer();
+        pbox.AddThemeConstantOverride("separation", 12);
+        _promoScreen.AddChild(pbox);
+
+        var plabel = new Label { Text = "Promote pawn to:", HorizontalAlignment = HorizontalAlignment.Center };
+        plabel.AddThemeFontSizeOverride("font_size", 28);
+        pbox.AddChild(plabel);
+
+        var prow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        prow.AddThemeConstantOverride("separation", 8);
+        pbox.AddChild(prow);
+        prow.AddChild(PromoButton("Queen", PieceType.Queen));
+        prow.AddChild(PromoButton("Rook", PieceType.Rook));
+        prow.AddChild(PromoButton("Bishop", PieceType.Bishop));
+        prow.AddChild(PromoButton("Knight", PieceType.Knight));
+    }
+
+    public void ShowPromotion(Action<PieceType> callback)
+    {
+        _promoCallback = callback;
+        _promoOverlay.Visible = true;
+        _promoScreen.Visible = true;
+    }
+
+    private Button PromoButton(string text, PieceType type)
+    {
+        var button = new Button { Text = text, CustomMinimumSize = new Vector2(96, 48) };
+        button.Pressed += () => ChoosePromotion(type);
+        return button;
+    }
+
+    private void ChoosePromotion(PieceType type)
+    {
+        _promoOverlay.Visible = false;
+        _promoScreen.Visible = false;
+        Action<PieceType>? cb = _promoCallback;
+        _promoCallback = null;
+        cb?.Invoke(type);
     }
 
     public override void _Process(double delta)

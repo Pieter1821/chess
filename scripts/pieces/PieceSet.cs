@@ -80,7 +80,7 @@ public partial class PieceSet : Node3D
 
         if (_legalTargets.Contains(sq))
         {
-            PlayerMove(_selSquare, sq);
+            BeginPlayerMove(_selSquare, sq);
             return;
         }
 
@@ -118,38 +118,60 @@ public partial class PieceSet : Node3D
         _boardView.ClearHighlights();
     }
 
-    private void PlayerMove(Square from, Square to)
+    private void BeginPlayerMove(Square from, Square to)
     {
         _selected = null;
         _legalTargets.Clear();
         _boardView.ClearHighlights();
 
-        ExecuteMove(from, to);
+        if (IsPromotion(from, to))
+            _hud.ShowPromotion(type => DoMove(from, to, type));   // ask which piece, then move
+        else
+            DoMove(from, to, null);
+    }
+
+    private void DoMove(Square from, Square to, PieceType? promotion)
+    {
+        ExecuteMove(from, to, promotion);
         _hud.IncrementMoves();
         if (AfterMove()) MaybeTriggerAi();
     }
 
-    private void ExecuteMove(Square from, Square to)
+    private bool IsPromotion(Square from, Square to)
+    {
+        if (_state[from] is not Piece p || p.Type != PieceType.Pawn) return false;
+        return to.Rank == (p.Color == PieceColor.White ? 7 : 0);
+    }
+
+    private void ExecuteMove(Square from, Square to, PieceType? promotion = null)
     {
         PlayMoveSound();
-        string desc = Notation.ToFriendly(_state, new Move(from, to));   // plain English, board BEFORE the move
+        string desc = Notation.ToFriendly(_state, new Move(from, to, promotion));   // board BEFORE the move
         Node3D moving = _pieces[from.File, from.Rank]!;
 
         Node3D? occupant = _pieces[to.File, to.Rank];
         if (occupant != null && _state[to] is Piece captured)
             SendToTray(occupant, captured.Color);
 
-        _pieces[to.File, to.Rank] = moving;
+        _state.ApplyMove(new Move(from, to, promotion));
         _pieces[from.File, from.Rank] = null;
-        _state.ApplyMove(new Move(from, to));
-        _history.AddMove(desc);
 
+        if (promotion is PieceType && _state[to] is Piece promoted)
+        {
+            moving.QueueFree();                                          // remove the pawn
+            SpawnPiece(promoted.Type, promoted.Color, to.File, to.Rank); // place the promoted piece
+        }
+        else
+        {
+            _pieces[to.File, to.Rank] = moving;
+            AnimateTo(moving, new Vector3(to.File, SurfaceY, to.Rank), MoveTime);
+        }
+
+        _history.AddMove(desc);
         string posKey = _state.PositionKey();
         _positions.TryGetValue(posKey, out int seen);
         _positions[posKey] = seen + 1;
         _repCount = seen + 1;
-
-        AnimateTo(moving, new Vector3(to.File, SurfaceY, to.Rank), MoveTime);
     }
 
     // Updates the HUD for the new side to move; returns false if the game has ended.
@@ -197,7 +219,7 @@ public partial class PieceSet : Node3D
         Move? choice = ChessAi.BestMove(_state, _aiColor, AiDepth);
         if (choice is Move move)
         {
-            ExecuteMove(move.From, move.To);
+            ExecuteMove(move.From, move.To, move.Promotion);
             AfterMove();   // note: no IncrementMoves — only the player's moves are counted
         }
     }

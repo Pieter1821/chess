@@ -20,3 +20,6 @@ bin/
 obj/
 *.user
 .gstack/
+
+# Stockfish engine binary (downloaded separately, too large for git)
+engine/

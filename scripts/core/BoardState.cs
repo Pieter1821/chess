@@ -17,7 +17,11 @@ public sealed class BoardState
         bool resetsClock = _squares[move.To.File, move.To.Rank] is not null
                            || (mover is Piece p && p.Type == PieceType.Pawn);
 
-        _squares[move.To.File, move.To.Rank] = mover;
+        Piece? placed = mover;
+        if (move.Promotion is PieceType promo && mover is Piece mp)
+            placed = new Piece(promo, mp.Color);
+
+        _squares[move.To.File, move.To.Rank] = placed;
         _squares[move.From.File, move.From.Rank] = null;
         SideToMove = SideToMove == PieceColor.White ? PieceColor.Black : PieceColor.White;
         HalfmoveClock = resetsClock ? 0 : HalfmoveClock + 1;

@@ -21,6 +21,8 @@ public static class Notation
             body = $"{Letter(piece.Type)}{Disambiguation(before, move, piece)}{capture}{move.To}";
         }
 
+        if (move.Promotion is PieceType promo) body += $"={Letter(promo)}";
+
         // Suffix from the resulting position: '#' for mate, '+' for check.
         BoardState after = before.WithMove(move);
         PieceColor opponent = piece.Color == PieceColor.White ? PieceColor.Black : PieceColor.White;
@@ -39,6 +41,7 @@ public static class Notation
         bool capture = before[move.To] is Piece;
         string verb = capture ? "takes" : "to";
         string text = $"{Name(piece.Type)} {move.From} {verb} {move.To}";
+        if (move.Promotion is PieceType promo) text += $", promotes to {Name(promo)}";
 
         BoardState after = before.WithMove(move);
         PieceColor opponent = piece.Color == PieceColor.White ? PieceColor.Black : PieceColor.White;

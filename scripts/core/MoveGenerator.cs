@@ -139,11 +139,12 @@ public static class MoveGenerator
     {
         int dir = me == PieceColor.White ? 1 : -1;
         int startRank = me == PieceColor.White ? 1 : 6;
+        int promoRank = me == PieceColor.White ? 7 : 0;
 
         var one = new Square(from.File, from.Rank + dir);
         if (one.IsOnBoard && board[one] is null)
         {
-            moves.Add(new Move(from, one));
+            AddPawnMove(moves, from, one, promoRank);
             var two = new Square(from.File, from.Rank + 2 * dir);
             if (from.Rank == startRank && board[two] is null)
                 moves.Add(new Move(from, two));
@@ -153,7 +154,23 @@ public static class MoveGenerator
         {
             var cap = new Square(from.File + df, from.Rank + dir);
             if (cap.IsOnBoard && board[cap] is Piece occ && occ.Color != me)
-                moves.Add(new Move(from, cap));
+                AddPawnMove(moves, from, cap, promoRank);
+        }
+    }
+
+    // Reaching the last rank promotes: emit one move per promotion choice.
+    private static void AddPawnMove(List<Move> moves, Square from, Square to, int promoRank)
+    {
+        if (to.Rank == promoRank)
+        {
+            moves.Add(new Move(from, to, PieceType.Queen));
+            moves.Add(new Move(from, to, PieceType.Rook));
+            moves.Add(new Move(from, to, PieceType.Bishop));
+            moves.Add(new Move(from, to, PieceType.Knight));
+        }
+        else
+        {
+            moves.Add(new Move(from, to));
         }
     }
 
