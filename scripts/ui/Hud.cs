@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 public partial class Hud : CanvasLayer
@@ -7,6 +8,9 @@ public partial class Hud : CanvasLayer
     private ColorRect _overlay = null!;
     private CenterContainer _endScreen = null!;
     private Label _banner = null!;
+    private Button _drawButton = null!;
+
+    public event Action? DrawRequested;
 
     private double _elapsed;
     private bool _running;
@@ -46,6 +50,19 @@ public partial class Hud : CanvasLayer
         var subtitle = new Label { Text = "Press any key to play again", HorizontalAlignment = HorizontalAlignment.Center };
         subtitle.AddThemeFontSizeOverride("font_size", 20);
         box.AddChild(subtitle);
+
+        _drawButton = new Button
+        {
+            Text = "Offer Draw",
+            AnchorTop = 1f,
+            AnchorBottom = 1f,
+            OffsetLeft = 16f,
+            OffsetRight = 132f,
+            OffsetTop = -52f,
+            OffsetBottom = -16f,
+        };
+        _drawButton.Pressed += () => DrawRequested?.Invoke();
+        AddChild(_drawButton);
     }
 
     public override void _Process(double delta)
@@ -78,6 +95,7 @@ public partial class Hud : CanvasLayer
         _running = false;
         _gameOver = true;
         _status.Text = "";
+        _drawButton.Visible = false;
         _banner.Text = message;
         _overlay.Visible = true;
         _endScreen.Visible = true;

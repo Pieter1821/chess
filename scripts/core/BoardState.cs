@@ -5,6 +5,7 @@ public sealed class BoardState
     private readonly Piece?[,] _squares = new Piece?[8, 8];
 
     public PieceColor SideToMove { get; private set; } = PieceColor.White;
+    public int HalfmoveClock { get; private set; }   // plies since the last capture or pawn move
 
     public Piece? this[Square s] => _squares[s.File, s.Rank];
 
@@ -12,9 +13,35 @@ public sealed class BoardState
 
     public void ApplyMove(Move move)
     {
-        _squares[move.To.File, move.To.Rank] = _squares[move.From.File, move.From.Rank];
+        Piece? mover = _squares[move.From.File, move.From.Rank];
+        bool resetsClock = _squares[move.To.File, move.To.Rank] is not null
+                           || (mover is Piece p && p.Type == PieceType.Pawn);
+
+        _squares[move.To.File, move.To.Rank] = mover;
         _squares[move.From.File, move.From.Rank] = null;
         SideToMove = SideToMove == PieceColor.White ? PieceColor.Black : PieceColor.White;
+        HalfmoveClock = resetsClock ? 0 : HalfmoveClock + 1;
+    }
+
+    // A compact string of the whole position (+ side to move) for repetition detection.
+    public string PositionKey()
+    {
+        var sb = new System.Text.StringBuilder(65);
+        for (int r = 0; r < 8; r++)
+        for (int f = 0; f < 8; f++)
+            sb.Append(_squares[f, r] is Piece pc ? PieceChar(pc) : '.');
+        sb.Append(SideToMove == PieceColor.White ? 'w' : 'b');
+        return sb.ToString();
+    }
+
+    private static char PieceChar(Piece p)
+    {
+        char c = p.Type switch
+        {
+            PieceType.Pawn => 'p', PieceType.Knight => 'n', PieceType.Bishop => 'b',
+            PieceType.Rook => 'r', PieceType.Queen => 'q', PieceType.King => 'k', _ => '?',
+        };
+        return p.Color == PieceColor.White ? char.ToUpper(c) : c;
     }
 
     public BoardState Clone()
@@ -22,6 +49,7 @@ public sealed class BoardState
         var copy = new BoardState();
         System.Array.Copy(_squares, copy._squares, _squares.Length);
         copy.SideToMove = SideToMove;
+        copy.HalfmoveClock = HalfmoveClock;
         return copy;
     }
 

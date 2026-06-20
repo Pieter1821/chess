@@ -2,33 +2,34 @@ using Godot;
 
 public partial class BoardInput : Node
 {
+    [Export] public float BoardSurfaceY = 0.1f;   // height of the squares' top surface
+
     private PieceSet _pieces = null!;
 
     public override void _Ready() => _pieces = GetNode<PieceSet>("../Pieces");
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (@event is InputEventMouseButton mb && mb.ButtonIndex == MouseButton.Left && mb.Pressed)
-        {
-            Camera3D cam = GetViewport().GetCamera3D();
-            if (cam == null) return;
+        if (@event is not InputEventMouseButton mb || mb.ButtonIndex != MouseButton.Left || !mb.Pressed)
+            return;
 
-            Vector3 from = cam.ProjectRayOrigin(mb.Position);
-            Vector3 to = from + cam.ProjectRayNormal(mb.Position) * 100f;
+        Camera3D cam = GetViewport().GetCamera3D();
+        if (cam == null) return;
 
-            var query = PhysicsRayQueryParameters3D.Create(from, to);
-            Godot.Collections.Dictionary hit = cam.GetWorld3D().DirectSpaceState.IntersectRay(query);
+        // Intersect the click ray with the board plane and read off the square.
+        // (More reliable than hitting thin tile colliders past tall pieces.)
+        Vector3 origin = cam.ProjectRayOrigin(mb.Position);
+        Vector3 dir = cam.ProjectRayNormal(mb.Position);
+        if (Mathf.IsZeroApprox(dir.Y)) return;
 
-            if (hit.Count > 0)
-            {
-                Node collider = hit["collider"].As<Node>();
-                if (collider != null && collider.HasMeta("file"))
-                {
-                    int file = collider.GetMeta("file").AsInt32();
-                    int rank = collider.GetMeta("rank").AsInt32();
-                    _pieces.HandleClick(file, rank);
-                }
-            }
-        }
+        float t = (BoardSurfaceY - origin.Y) / dir.Y;
+        if (t < 0f) return;                       // plane is behind the camera
+        Vector3 point = origin + dir * t;
+
+        int file = Mathf.RoundToInt(point.X);
+        int rank = Mathf.RoundToInt(point.Z);
+        if (file is < 0 or > 7 || rank is < 0 or > 7) return;   // clicked off the board (e.g. a tray)
+
+        _pieces.HandleClick(file, rank);
     }
 }

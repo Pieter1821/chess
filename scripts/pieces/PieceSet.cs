@@ -21,6 +21,7 @@ public partial class PieceSet : Node3D
     private BoardState _state = null!;
     private Board _boardView = null!;
     private Hud _hud = null!;
+    private MoveHistory _history = null!;
     private AudioStreamPlayer _moveSound = null!;
 
     private Node3D? _selected;
@@ -31,6 +32,8 @@ public partial class PieceSet : Node3D
     private PieceColor _aiColor;
     private PieceColor _playerColor;
     private bool _gameOver;
+    private readonly Dictionary<string, int> _positions = new();
+    private int _repCount;
 
     private int _capturedWhite, _capturedBlack;
 
@@ -38,6 +41,8 @@ public partial class PieceSet : Node3D
     {
         _boardView = GetNode<Board>("../Board");
         _hud = GetNode<Hud>("../Hud");
+        _history = GetNode<MoveHistory>("../MoveHistory");
+        _hud.DrawRequested += OfferDraw;
         _state = BoardState.CreateStartingPosition();
 
         _moveSound = new AudioStreamPlayer { Stream = GD.Load<AudioStream>("res://assets/audio/move.mp3") };
@@ -127,6 +132,7 @@ public partial class PieceSet : Node3D
     private void ExecuteMove(Square from, Square to)
     {
         PlayMoveSound();
+        string desc = Notation.ToFriendly(_state, new Move(from, to));   // plain English, board BEFORE the move
         Node3D moving = _pieces[from.File, from.Rank]!;
 
         Node3D? occupant = _pieces[to.File, to.Rank];
@@ -136,6 +142,12 @@ public partial class PieceSet : Node3D
         _pieces[to.File, to.Rank] = moving;
         _pieces[from.File, from.Rank] = null;
         _state.ApplyMove(new Move(from, to));
+        _history.AddMove(desc);
+
+        string posKey = _state.PositionKey();
+        _positions.TryGetValue(posKey, out int seen);
+        _positions[posKey] = seen + 1;
+        _repCount = seen + 1;
 
         AnimateTo(moving, new Vector3(to.File, SurfaceY, to.Rank), MoveTime);
     }
@@ -144,25 +156,30 @@ public partial class PieceSet : Node3D
     private bool AfterMove()
     {
         PieceColor side = _state.SideToMove;
-        switch (MoveGenerator.Status(_state, side))
-        {
-            case GameStatus.Checkmate:
-                _gameOver = true;
-                _hud.GameOver($"Checkmate — {Other(side)} wins!");
-                break;
-            case GameStatus.Stalemate:
-                _gameOver = true;
-                _hud.GameOver("Stalemate — draw");
-                break;
-            case GameStatus.Check:
-                _hud.SetStatus($"{side} to move — Check!");
-                break;
-            default:
-                _hud.SetStatus($"{side} to move");
-                break;
-        }
+        GameStatus status = MoveGenerator.Status(_state, side);
+
+        if (status == GameStatus.Checkmate) EndGame($"Checkmate — {Other(side)} wins!");
+        else if (status == GameStatus.Stalemate) EndGame("Draw — stalemate");
+        else if (MoveGenerator.IsInsufficientMaterial(_state)) EndGame("Draw — insufficient material");
+        else if (_state.HalfmoveClock >= 100) EndGame("Draw — 50-move rule");
+        else if (_repCount >= 3) EndGame("Draw — threefold repetition");
+        else _hud.SetStatus(status == GameStatus.Check ? $"{side} to move — Check!" : $"{side} to move");
+
         UpdateClock();
         return !_gameOver;
+    }
+
+    private void EndGame(string message)
+    {
+        _gameOver = true;
+        _hud.GameOver(message);
+    }
+
+    private void OfferDraw()
+    {
+        if (_gameOver) return;
+        EndGame("Draw — agreed");
+        UpdateClock();
     }
 
     // The clock ticks only on the player's turn (and only while the game is live).
@@ -173,6 +190,7 @@ public partial class PieceSet : Node3D
     {
         if (_gameOver || !_vsComputer || _state.SideToMove != _aiColor) return;
 
+        _hud.SetStatus("Computer is thinking...");
         await ToSignal(GetTree().CreateTimer(AiThinkTime), SceneTreeTimer.SignalName.Timeout);
         if (_gameOver) return;
 

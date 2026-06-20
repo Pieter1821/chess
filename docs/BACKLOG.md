@@ -30,7 +30,9 @@ Status of the feature list. The game must stay **fun and accessible**, not hard 
 
 ## 3. UI / UX upgrades
 - [ ] Turn indicator upgrade (color + icon + banner, not just text)
-- [ ] Move-history side panel (current move highlighted)
+- [x] Move-history side panel (plain-English descriptions)
+- [ ] Move-notation toggle: plain English (default) vs algebraic SAN for chess players
+- [ ] Highlight the current move in the history panel
 - [ ] Board orientation toggle (manual flip) + coordinates toggle (a-h / 1-8)
 - [ ] In-game side menu (pause / new game / options)
 

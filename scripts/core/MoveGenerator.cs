@@ -45,6 +45,30 @@ public static class MoveGenerator
         return king.IsOnBoard && IsAttacked(board, king, Opposite(color));
     }
 
+    // True for K vs K, K+minor vs K, and same-coloured-bishops positions (can't force mate).
+    public static bool IsInsufficientMaterial(BoardState board)
+    {
+        int knights = 0;
+        var bishopColors = new List<int>();
+        for (int f = 0; f < 8; f++)
+        for (int r = 0; r < 8; r++)
+        {
+            if (board[new Square(f, r)] is not Piece p) continue;
+            switch (p.Type)
+            {
+                case PieceType.King: break;
+                case PieceType.Knight: knights++; break;
+                case PieceType.Bishop: bishopColors.Add((f + r) % 2); break;
+                default: return false;   // a pawn, rook or queen can deliver mate
+            }
+        }
+
+        if (knights == 0 && bishopColors.Count == 0) return true;                       // K vs K
+        if (knights == 1 && bishopColors.Count == 0) return true;                       // K+N vs K
+        if (knights == 0 && bishopColors.TrueForAll(c => c == bishopColors[0])) return true; // same-colour bishops
+        return false;
+    }
+
     // ---------- internals ----------
 
     private static List<Move> CollectMoves(BoardState board, PieceColor color, bool legalOnly)

@@ -1,0 +1,96 @@
+using System.Collections.Generic;
+
+// Converts a move into Standard Algebraic Notation (SAN). Pure logic, no Godot.
+public static class Notation
+{
+    public static string ToSan(BoardState before, Move move)
+    {
+        if (before[move.From] is not Piece piece)
+            return $"{move.From}{move.To}";
+
+        bool isCapture = before[move.To] is Piece;
+        string body;
+
+        if (piece.Type == PieceType.Pawn)
+        {
+            body = isCapture ? $"{FileChar(move.From.File)}x{move.To}" : $"{move.To}";
+        }
+        else
+        {
+            string capture = isCapture ? "x" : "";
+            body = $"{Letter(piece.Type)}{Disambiguation(before, move, piece)}{capture}{move.To}";
+        }
+
+        // Suffix from the resulting position: '#' for mate, '+' for check.
+        BoardState after = before.WithMove(move);
+        PieceColor opponent = piece.Color == PieceColor.White ? PieceColor.Black : PieceColor.White;
+        GameStatus status = MoveGenerator.Status(after, opponent);
+        if (status == GameStatus.Checkmate) body += "#";
+        else if (status == GameStatus.Check) body += "+";
+
+        return body;
+    }
+
+    // A plain-English description for players who don't read chess notation.
+    public static string ToFriendly(BoardState before, Move move)
+    {
+        if (before[move.From] is not Piece piece) return $"{move.From} to {move.To}";
+
+        bool capture = before[move.To] is Piece;
+        string verb = capture ? "takes" : "to";
+        string text = $"{Name(piece.Type)} {move.From} {verb} {move.To}";
+
+        BoardState after = before.WithMove(move);
+        PieceColor opponent = piece.Color == PieceColor.White ? PieceColor.Black : PieceColor.White;
+        GameStatus status = MoveGenerator.Status(after, opponent);
+        if (status == GameStatus.Checkmate) text += " checkmate";
+        else if (status == GameStatus.Check) text += " check";
+        return text;
+    }
+
+    private static string Name(PieceType type) => type switch
+    {
+        PieceType.Pawn => "Pawn",
+        PieceType.Knight => "Knight",
+        PieceType.Bishop => "Bishop",
+        PieceType.Rook => "Rook",
+        PieceType.Queen => "Queen",
+        PieceType.King => "King",
+        _ => "",
+    };
+
+    // If another same-type piece could also move to the destination, add just enough
+    // of the source square (file, else rank, else both) to make it unambiguous.
+    private static string Disambiguation(BoardState board, Move move, Piece piece)
+    {
+        var others = new List<Square>();
+        for (int f = 0; f < 8; f++)
+        for (int r = 0; r < 8; r++)
+        {
+            var sq = new Square(f, r);
+            if (sq == move.From) continue;
+            if (board[sq] is Piece p && p.Type == piece.Type && p.Color == piece.Color
+                && MoveGenerator.LegalMoves(board, sq).Exists(m => m.To == move.To))
+                others.Add(sq);
+        }
+
+        if (others.Count == 0) return "";
+        bool sameFile = others.Exists(s => s.File == move.From.File);
+        bool sameRank = others.Exists(s => s.Rank == move.From.Rank);
+        if (!sameFile) return $"{FileChar(move.From.File)}";
+        if (!sameRank) return $"{move.From.Rank + 1}";
+        return $"{FileChar(move.From.File)}{move.From.Rank + 1}";
+    }
+
+    private static char FileChar(int file) => (char)('a' + file);
+
+    private static string Letter(PieceType type) => type switch
+    {
+        PieceType.Knight => "N",
+        PieceType.Bishop => "B",
+        PieceType.Rook => "R",
+        PieceType.Queen => "Q",
+        PieceType.King => "K",
+        _ => "",
+    };
+}
