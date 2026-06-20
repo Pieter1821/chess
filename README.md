@@ -101,7 +101,6 @@ Original game code © 2026 the project owner.
 
 ## Roadmap
 
-- Castling & en passant
 - Move-history click-to-jump, undo/redo, replay
 - PGN / FEN export & import
 - Settings menu (sound, language, board flip, coordinates)

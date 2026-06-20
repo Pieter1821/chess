@@ -22,7 +22,8 @@ obj/
 .gstack/
 
 # Stockfish engine binary (downloaded separately, too large for git)
-engine/
+# Leading slash anchors to repo root so it does NOT match scripts/engine/.
+/engine/
 
 # Local docs / planning notes (not part of the shipped game)
 docs/
