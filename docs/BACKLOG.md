@@ -21,6 +21,7 @@ Status of the feature list. The game must stay **fun and accessible**, not hard 
 - [ ] Click a move -> jump to that board state
 - [ ] Undo / redo (step through full game state)
 - [ ] Extra draws: 3-fold repetition, 50-move rule, insufficient material
+- [ ] Draw offer / agree to draw (mutual agreement) + claim-draw button when stuck
 
 ## 2. Gameplay improvements
 - [ ] Last-move highlight (origin + destination)
@@ -43,7 +44,16 @@ Status of the feature list. The game must stay **fun and accessible**, not hard 
 - [ ] Smooth capture animation (fade/slide)
 - [ ] Save / load local games (files in `user://`)
 
-## 6. Online (own phase, later)
+## 6. Product & platform (enterprise polish)
+- [x] Fullscreen by default (F11 toggles, Esc exits)
+- [x] App metadata: name "Chess", version, description (project.godot)
+- [ ] App icon + window icon  <- REMINDER
+- [ ] Boot splash screen  <- REMINDER
+- [ ] Custom mouse cursor  <- REMINDER
+- [ ] Language / localization (i18n): Godot TranslationServer + CSV/PO files, language selector in settings
+- [ ] Settings menu (fullscreen, volume, language, coords/flip toggles)
+
+## 7. Online (own phase, later)
 - [ ] Login / register + cloud saves + leaderboards
 - Recommendation: **Supabase** (Postgres + Auth + REST + row-level security), called from Godot via `HTTPRequest`. Local-first features come first; this is a dedicated phase.
 

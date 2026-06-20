@@ -225,7 +225,7 @@ public partial class PieceSet : Node3D
 
         Color tint = color == PieceColor.White
             ? new Color(0.92f, 0.90f, 0.85f)
-            : new Color(0.18f, 0.16f, 0.16f);
+            : new Color(0.22f, 0.20f, 0.20f);
         ApplyTint(piece, tint);
 
         AddChild(piece);

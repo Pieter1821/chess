@@ -11,8 +11,16 @@ config_version=5
 [application]
 
 config/name="Chess"
+config/description="A polished 3D chess game."
+config/version="0.1.0"
 run/main_scene="res://scenes/main/main.tscn"
 config/features=PackedStringArray("4.6", "C#", "Forward Plus")
+
+[display]
+
+window/size/mode=3
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 
 [dotnet]
 
